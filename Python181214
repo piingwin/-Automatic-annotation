@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+import re
+from lxml import etree
+from lxml.html import tostring
+
+class Teachers:
+    def __init__(self):
+      self.list_of_teachers = []
+      
+    def add_teacher(self, *args):
+      self.list_of_teachers.append(Teacher(*args))
+
+    def import_list_of_teachers_to_file(self, filename):
+       h = open(filename, 'w+')
+       for p in self.list_of_teachers:
+         h.write("%s#%s#%s#%s#%s#%s#%s\n" % (p.fname, p.name, p.mname, p.post, p.address, p.phone, ' '.join(p.email)))
+       h.close()
+
+class Teacher:
+    def __init__(self, *args):
+        self.fname, self.name, self.mname, self.post, self.address, self.phone, self.email = args
+
+def get_text_content(obj):
+  try:
+      value = obj.text.strip()
+      return value
+  except:
+      return ''
+
+def more_fio(fio):
+  fio = fio.split()
+  l = len(fio)
+  #отчества может не быть совсем
+  while l < 3:
+    fio.append('')
+    l += 1
+  #отчество может состоять из 2х слов, например с добавкой оглы
+  if l > 3:
+    new_fio = fio[:2]
+    new_fio.append(' '.join(fio[2:]))
+  else:
+    new_fio = fio
+  
+  return new_fio
+
+def check_class_attrib(value, class_name):
+  if 'class' in value.attrib.keys():
+    if value.attrib['class'] == class_name:
+        return True
+  return False
+
+def run():
+  teachers = Teachers()
+  root = etree.parse('teachers2.html', etree.HTMLParser())
+  
+  item_blocks = root.xpath(".//*[@class='emp-list']/div/div[@class='emp-text']")
+  for item in item_blocks:
+    emp_fio_block = item.xpath('div[@class="emp-fio"]/a')
+    fio = emp_fio_block[0].text
+    
+    detail_block = item.xpath('div[@class="emp-description"]/p[@class="details"]')
+    if detail_block:
+      detail = detail_block[0].text
+    else: 
+      detail = ''
+    
+    addr_block = item.xpath('div[@class="emp-description"]/p[@class="addr"]')
+    if addr_block:
+      addr = addr_block[0].text
+    else: 
+      addr = ''
+      
+    tel_block = item.xpath('div[@class="emp-description"]/p[@class="tel"]')
+    if tel_block:
+      tel = tel_block[0].text
+    else: 
+      tel = ''
+
+    tmp_fio = more_fio(fio)
+    fname, name, mname = tmp_fio
+    emails = []
+    
+    desc_text = tostring(item)
+    email_list = re.findall('document.write\((.*)?\)',desc_text)
+    if email_list:
+      for e in email_list:
+        email = e.replace("'",'').replace('+','').replace('<wbr/>','')
+        emails.append(email)
+                              
+    teachers.add_teacher(fname,name,mname,detail,addr,tel,emails)
+    
+    
+    
+  #for item in root.iter('div'):
+          ##находим ФИО
+          #if check_class_arrtib(children[0], 'emp-fio'):
+            #fio = get_text_content(children[0].getchildren()[0])
+            #if fio:
+              ##вдруг у кого-то не прописано имя с отчеством или отчество
+              #tmp_fio = more_fio(fio)
+              #fname, name, mname = tmp_fio
+            #else:
+                #continue
+          #else:
+              #continue
+    
+          ##находим другие атрибуты
+          #info = []
+          #if check_class_arrtib(children[1], 'emp-description'):
+              #desc_children = children[1].getchildren()
+              #details = addr = tel = ''
+              #emails = []              
+              #for child in desc_children:
+                  #if check_class_arrtib(child, 'details'):
+                      #details = get_text_content(child)
+                  #elif check_class_arrtib(child, 'addr'):
+                      #addr = get_text_content(child)
+                  #elif check_class_arrtib(child, 'tel'):
+                      #tel = get_text_content(child)                      
+                  #elif check_class_arrtib(child, 'email'):
+                      ##находим емайл
+                      #desc_text = tostring(children[1])
+                      #email_list = re.findall('document.write\((.*)?\)',desc_text)
+                      #if email_list:
+                          #for e in email_list:
+                              #email = e.replace("'",'').replace('+','').replace('<wbr/>','')
+                              #emails.append(email)
+          #else:
+              #continue
+
+          #teachers.add_teacher(fname,name,mname,details,addr,tel,emails)
+    
+  return teachers
+  
+if __name__ == '__main__':
+    teachers = run()
+    teachers.import_list_of_teachers_to_file('madtest.csv')
