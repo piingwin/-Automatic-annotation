@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import pymorphy2
+
+import re
+from time import process_time
+
+def read_file(f):
+    with open(f, 'r') as h:
+        strings = h.readlines()
+    h.close()
+    return strings
+    
+def finder(f1, f2):
+    def prep_str(x):
+        s = x.rstrip()
+        return re.sub('\W*$', '', s)
+
+    morph = pymorphy2.MorphAnalyzer()
+
+    start = process_time()
+  
+    # we read file with poem and get words-forms
+    poem  = read_file(f1)
+    poem_dublicate = [prep_str(x) for x in poem]
+    
+    words = read_file(f2)
+    words = [x.strip().lower() for x in words]
+    
+    #collect all words forms
+    words_forms = []
+    for i in words:
+        match = morph.parse(i)[0]
+        forms = match.lexeme
+        for f in forms:
+            words_forms.append(f.word)
+
+    if not words_forms:
+        print('nothing to search')
+        return
+    
+    #start to search, prepair first
+    poem_length = len(poem) - 1
+    snippets = []
+    all_words_forms = '|'.join(words_forms)
+    m = re.compile(all_words_forms, flags=re.I)
+    e = re.compile('\w+$')
+    compare = []
+    near = []
+    for n, i in enumerate(poem_dublicate):
+        # we got match
+        if m.search(i):
+            snippet = ''
+            if n > 0:
+                snippet += poem[n-1]
+            snippet += poem[n]
+            if n != poem_length:
+                snippet += poem[n+1]
+            snippets.append(snippet)
+            
+        # looking for near words
+        result = e.search(i)
+        if result:
+            last_word = result.group().lower()
+            compare.append(last_word)
+            if len(compare) == 2:
+                if compare[0] in words and compare[0][-2:] == compare[1][-2:]:
+                    near.append(compare[1])
+                if compare[1] in words and compare[0][-2:] == compare[1][-2:]:
+                    near.append(compare[0])
+                del(compare[0]) 
+        else:
+            compare = []
+            
+    print(process_time() - start, " seconds process time")
+    return snippets, set(near)
+   
+if __name__ == '__main__':
+    snippets, near = finder('long_poem.txt', 'words.txt')
+    
+    h = open('snippets.txt', 'w+')
+    for s in snippets:
+        h.write('%s\n' % s)
+    h.close
+    
+    h = open('rhymes.txt', 'w+')
+    for s in near:
+        h.write('%s\n' % s)
+    h.close
