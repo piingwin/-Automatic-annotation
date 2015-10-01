@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import urllib.request
+import math
+import xml.sax
+
+def get_file_name(lang):
+    return '%swiki-latest-pages-articles.xml' % lang
+
+def load_dump():
+    lang = input("Lang: ").lower()
+    file = get_file_name(lang) + '.bz2'
+    
+    url = 'https://dumps.wikimedia.org/%swiki/latest/%s' % (lang, file)
+    req = urllib.request.urlopen(url)
+    
+    total_size = req.headers.get('Content-Length').strip()
+    total_size = int(total_size)
+    
+    downloaded = 0
+    downloaded_total_two = 0
+    
+    CHUNK = 8192
+    
+    with open(file, 'wb+') as h:
+        while True:
+            chunk = req.read(CHUNK)
+            downloaded += len(chunk)
+            
+            downloaded_total_one = math.floor(100 * downloaded / total_size)
+            if downloaded_total_one != downloaded_total_two:
+                downloaded_total_two = downloaded_total_one
+                print('loaded already: ', downloaded_total_two, '%')
+            
+            if not chunk: 
+                break
+            
+            h.write(chunk)
+
+def find_articles(lang):
+    def sortByAlphabet(inputStr):
+        return inputStr[0].lower()
+  
+    class FindTitleHandler(xml.sax.ContentHandler):
+        def __init__(self):
+            self.CurrentData = ""
+            self.title = ""
+            self.titles = []
+        
+        # Call when an element starts
+        def startElement(self, tag, attributes):
+            self.CurrentData = tag
+        
+        # Call when an elements ends
+        def endElement(self, tag):
+            if self.CurrentData == "title":
+                self.titles.append(self.title)
+        
+        # Call when a character is read
+        def characters(self, content):
+            if self.CurrentData == "title":
+                self.title = content
+
+        def __del__(self):
+            self.titles.sort(key=sortByAlphabet)
+            h = open('article_names.txt', 'w+')
+            for i in self.titles:
+                h.write('%s \n' % i)
+            h.close
+
+    
+    file = get_file_name(lang)
+    
+    parser = xml.sax.make_parser()
+    # turn off namepsaces
+    parser.setFeature(xml.sax.handler.feature_namespaces, 0)
+    # override the default ContextHandler
+    Handler = FindTitleHandler()
+    parser.setContentHandler(Handler)
+    parser.parse(file)
+    
+
+#if __name__ == '__main__':
+    #find_articles('ru')
