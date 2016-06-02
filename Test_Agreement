@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+
+import re
+import glob
+import nltk
+
+
+def get_sentences(text):
+    sentences = re.split(r'(?:[.]\s*){3}|[.?!\n]', text)
+    return [x.strip() for x in sentences]
+
+def there_finder():
+    m = re.compile('(there(\'s|\'re|\s+was|\s+were|\s+is|\s+are))(.+)', flags=re.I)
+    
+    all_noun_forms = ('NN', 'NNS', 'NNP', 'NNPS')
+    
+    files = glob.glob("data for test agreement/*.txt")
+    print(files)
+    for file_name in files:
+        i = 0
+        with open (file_name, encoding = 'utf8') as one_file:
+            file_content = one_file.read()
+#           text = file_content.replace('\n', '')
+            sentences = get_sentences(file_content)
+            for sentence in sentences:
+                result = m.search(sentence)
+                if result:
+                    # в result.groups()[0] - лежит there + окончание, например there's
+                    # в result.groups()[1] - лежит окончание  слова there, например 's
+                    # в result.groups()[2] - лежит окончание  предложения
+                    
+                    there_tokens = nltk.word_tokenize(result.groups()[0])
+                    # в there_tagged будет лежать [('there', 'EX'), ("'s", 'VBZ')]
+                    there_tagged = nltk.pos_tag(there_tokens)
+
+
+                    sentence_end_tokens = nltk.word_tokenize(result.groups()[2])
+                    # в sentence_end_tagged будет лежать [('so', 'RB'), ('many', 'JJ'), ('dogs', 'NNS')]
+                    sentence_end_tagged = nltk.pos_tag(sentence_end_tokens)
+                    
+                    
+                    noun_form = ''
+                    word = ''
+
+                    if sentence_end_tagged[0][1] == 'DT':
+                          if sentence_end_tagged[1][1] in all_noun_forms and sentence_end_tagged[1][0] != 'lot':
+                                noun_form = sentence_end_tagged[1][1]
+ #                               word = sentence_end_tagged[1][0]
+                                word = there_tagged[1][0]
+
+                                
+                    elif sentence_end_tagged[0][1] in all_noun_forms:
+                          noun_form = sentence_end_tagged[0][1]
+                          word = sentence_end_tagged[0][0]
+                              
+
+                    if result.groups()[2].strip().startswith('a lot of'):
+                          if sentence_end_tagged[0][1] == 'DT':
+                                if sentence_end_tagged[1][1] == 'NN' and sentence_end_tagged[2][1] == 'IN':
+                                      if sentence_end_tagged[3][1] in all_noun_forms:
+                                            noun_form = sentence_end_tagged[3][1]
+                                            word = sentence_end_tagged[3][0]
+
+                    for k, tag in enumerate(there_tagged):
+                        if tag[1] == 'VB' or tag[1] == 'VBP' or tag[1] == 'VBZ':
+                            index = k
+                            
+
+                    verb_form = there_tagged[index][1]
+                    
+                    #VBZ = is, 's; VBP = are, 're
+                    if noun_form == 'NN' and verb_form == 'VBP' or \
+                       noun_form == 'NNS' and verb_form == 'VBZ' or \
+                       noun_form == 'NNP' and verb_form == 'VBP' or \
+                       noun_form == 'NNPS' and verb_form == 'VBZ':
+                          print("Mistake in %s! %s" % (file_name, sentence))
+                          sentence_position = file_content.find(sentence)
+                          print (sentence_position)
+                          word_position = sentence.find(word)
+                          print (word_position)
+                          start = sentence_position + word_position
+                          end = start + len(word)
+                          print (file_content[start:end])
+
+                          file_name2 = file_name.split('.')[0] + '.ann'
+                          with open (file_name2, encoding = 'utf-8') as f:
+                                file_content2 = f.read()
+                                print (start, end)
+
+
+                          finded = re.findall('T(\d+)', file_content2)
+                          finded2 = [int(x) for x in finded]
+                          maxT = max(finded2)
+                          print (maxT)
+                          f1 = open('data for test agreement/esl_00912.ann', 'a')
+                          f1.write('T371\tAgreement Number 1290 1292 \tis')
+
+                        
+if __name__ == '__main__':
+    there_finder()
+  
